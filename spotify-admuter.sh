@@ -60,8 +60,7 @@ LOCPLAY=0
 PAUSESIGNAL=0
 ADFINISHED=0
 
-PACMD="/usr/bin/pacmd"
-PACTL="/usr/bin/pactl"
+PACTL="$(type -p pactl)"
 
 ## FUNCTIONS
 
