@@ -4,7 +4,7 @@
 # CHANGELOG: https://github.com/SecUpwN/Spotify-AdKiller/blob/master/CHANGELOG.md
 # Feel free to contribute improvements and suggestions to this funky script!
 
-# Wrapper script to automatically start Spotify-AdKiller when Spotify starts
+# Wrapper script to automatically start Spotify-AdMuter when Spotify starts
 
 # Please make sure to consult the attached README file before using this script
 
@@ -37,9 +37,9 @@
 
 # settings
 
-ADKILLER="spotify-adkiller.sh"
+ADMUTER="spotify-admuter.sh"
 WMCLASS="Spotify"
-LOGFILE="$XDG_RUNTIME_DIR/.Spotify-AdKiller.log"
+LOGFILE="$XDG_RUNTIME_DIR/.Spotify-AdMuter.log"
 
 # DNS-BLOCK
 
@@ -60,11 +60,11 @@ COUNTER="0"
 
 # config
 
-CONFIG_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/Spotify-AdKiller"
-CONFIG_FILE="$CONFIG_PATH/Spotify-AdKiller.cfg"
+CONFIG_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/Spotify-AdMuter"
+CONFIG_FILE="$CONFIG_PATH/Spotify-AdMuter.cfg"
 CONFIG_DEFAULT=\
 '##                                                      ##
-## Configuration file for Spotify-AdKiller              ##
+## Configuration file for Spotify-AdMuter                ##
 ## Please make sure to double-quote all custom values   ##
 ##                                                      ##
 
@@ -95,7 +95,7 @@ DEBUG="1"
 # - "1" to enable
 # - "0" to disable
 # -> Will make the CLI output more verbose and write a logfile
-#    to "$XDG_RUNTIME_DIR/.Spotify-AdKiller.log"'
+#    to "$XDG_RUNTIME_DIR/.Spotify-AdMuter.log"'
 
 ## CLI MESSAGES
 
@@ -105,7 +105,7 @@ INFOMSG1="DEBUG mode active"
 ## FUNCTIONS
 
 notify_send(){
-    notify-send -i spotify-client "Spotify-AdKiller" "$1"
+    notify-send -i spotify-client "Spotify-AdMuter" "$1"
 }
 
 read_write_config(){
@@ -137,16 +137,16 @@ spotify_launch(){
     done
 }
 
-adkiller_launch(){
+admuter_launch(){
     # only launch script if it isn't active already
     # we need to truncate script name to make pgrep work
-    if [[ -z "$(pgrep "${ADKILLER:0:14}")" ]]; then
+    if [[ -z "$(pgrep "${ADMUTER:0:14}")" ]]; then
       if [[ "$DEBUG" = "1" ]]; then
         echo "$INFOMSG1"
         notify_send "$INFOMSG1"
-        $ADKILLER 2>&1 > "$LOGFILE"  &
+        $ADMUTER 2>&1 > "$LOGFILE"  &
       else
-        $ADKILLER 2>/dev/null  &
+        $ADMUTER 2>/dev/null  &
       fi
     fi
 }
@@ -155,4 +155,4 @@ adkiller_launch(){
 
 read_write_config
 spotify_launch "$@"
-adkiller_launch
+admuter_launch
