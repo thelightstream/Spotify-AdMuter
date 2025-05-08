@@ -60,8 +60,8 @@ LOCPLAY=0
 PAUSESIGNAL=0
 ADFINISHED=0
 
-PACMD=/opt/local/bin/pacmd
-PACTL=/opt/local/bin/pactl
+PACMD="/usr/bin/pacmd"
+PACTL="/usr/bin/pactl"
 
 ## FUNCTIONS
 
@@ -91,7 +91,11 @@ read_config(){
 
 # Makes sure a string ends with a slash. This can be necessary when trying to find files in a directory via find.
 append_missing_slash() {
-    echo "${@%/}/"
+    if [ -d "$1" ]; then
+        echo "${1%/}/"
+    else
+        echo "$1"
+    fi
 }
 
 set_musicdir(){
@@ -117,7 +121,7 @@ Switching to simple automute (no local playback)"
 
     echo "## Music path: $LOCAL_MUSIC ##"
 
-    if [[ -z "$(find -L "$LOCAL_MUSIC" -iname "*.mp3" 2> /dev/null )" ]]; then
+if [[ -z "$(find -L "$LOCAL_MUSIC" -iname "*.mp3" 2> /dev/null)" ]] && [[ ! -f "$LOCAL_MUSIC" || ! "$LOCAL_MUSIC" =~ \.(m3u|pls)$ ]]; then
         report_error "No music found in the specified location. Please check the settings.
 Switching to simple automute (no local playback)"
         CUSTOM_MODE="simple"
@@ -131,24 +135,24 @@ set_player(){
     elif type cvlc > /dev/null 2>&1; then
       # vlc volume ranges from 0..256
       PLAYER="cvlc --play-and-exit --volume=$((256*VOLUME/100))"
-      LOOPOPT="--repeat"
+#      LOOPOPT="--repeat" # This causes the default behavior to be to loop any track played forever.
     elif type mplayer > /dev/null 2>&1; then
       PLAYER="mplayer -vo null --volume=$VOLUME"
-      LOOPOPT="-loop"
+#      LOOPOPT="--repeat" # This causes the default behavior to be to loop any track played forever.
     elif type mpv > /dev/null 2>&1; then
       PLAYER="mpv --vo null --volume=$VOLUME"
-      LOOPOPT="--loop=inf"
+#      LOOPOPT="--repeat" # This causes the default behavior to be to loop any track played forever.
     elif type mpg321 > /dev/null 2>&1; then
       PLAYER="mpg321 -g $VOLUME"
-      LOOPOPT="--loop 0"
+#      LOOPOPT="--repeat" # This causes the default behavior to be to loop any track played forever.
     elif type avplay > /dev/null 2>&1; then
       # custom volume not supported
       PLAYER="avplay -nodisp -autoexit"
-      LOOPOPT="-loop 0"
+#      LOOPOPT="--repeat" # This causes the default behavior to be to loop any track played forever.
     elif type ffplay > /dev/null 2>&1; then
       # custom volume not supported
       PLAYER="ffplay -nodisp -autoexit"
-      LOOPOPT="-loop 0"
+#      LOOPOPT="--repeat" # This causes the default behavior to be to loop any track played forever.
     else
       if [[ "$CUSTOM_MODE" != "simple" ]]; then
         report_error "No supported audio player detected. Please install one of the supported \
@@ -222,15 +226,15 @@ get_track_info(){
 }
 
 get_pactl_info(){
-  ${PACMD} list-sink-inputs | grep -B 26 "application.process.binary = \"$BINARY\""
+  ${PACTL} list sink-inputs | grep -B 26 "application.process.binary = \"$BINARY\""
 }
 
 detect_paused() {
   # there can be multiple Spotify sinks, so we should check if any of them are running;
   # playback is paused effectively only when all instances are corked
   STATES=$(get_pactl_info)
-  CORKED=$(echo "${STATES}" | fgrep 'state: CORKED')
-  RUNNING=$(echo "${STATES}" | fgrep 'state: RUNNING')
+  CORKED=$(echo "${STATES}" | grep -F 'state: CORKED')
+  RUNNING=$(echo "${STATES}" | grep -F 'state: RUNNING')
   debuginfo "CORKED=\"${CORKED}\" RUNNING=\"${RUNNING}\""
   [[ "${CORKED}" != "" && "${RUNNING}" = "" ]]
 }
@@ -290,8 +294,8 @@ get_state(){
 }
 
 get_pactl_nr(){
-    LC_ALL=C ${PACMD} list-sink-inputs | awk -v binary="$BINARY" '
-            $1 == "index:" {idx = $2}
+    LC_ALL=C ${PACTL} list sink-inputs| awk -v binary="$BINARY" '
+            /^Sink Input #[0-9]+/ { idx = $3; sub(/^#/, "", idx) }
             $1 == "application.process.binary" && $3 == "\"" binary "\"" {print idx}
         '
     # awk script by Glenn Jackmann (http://askubuntu.com/users/10127/)
@@ -331,7 +335,11 @@ spotify_dbus(){
 }
 
 player(){
-    RANDOM_TRACK="$(find -L "$LOCAL_MUSIC" -iname "*.mp3" 2> /dev/null | sort --random-sort | head -1)"
+    if [ -d "$LOCAL_MUSIC" ]; then
+      RANDOM_TRACK="$(find -L "$LOCAL_MUSIC" -iname "*.mp3" 2> /dev/null | sort --random-sort | head -1)"
+    elif [[ -f "$LOCAL_MUSIC" && "$LOCAL_MUSIC" =~ \.(m3u|pls)$ ]]; then
+      RANDOM_TRACK="$(grep -vE '^\s*#|^\s*$' "$LOCAL_MUSIC" | shuf -n 1)"
+    fi
     notify_send "Playing ${RANDOM_TRACK##$LOCAL_MUSIC/}"
     ${PLAYER} $2 "$RANDOM_TRACK" > /dev/null 2>&1 &           # Play random track
     PLAYER_PID="$!"                                           # Get PLAYER PID
@@ -358,6 +366,10 @@ automute_continuous(){
      "$INITIALRUN" = "0" ]]
       then
           echo "## Regular track ##"
+          echo "sleeping 1 second to clear ad from buffer"
+          sleep 1.2
+
+          unmute
 
     # no ad, regular pause
     elif [[ "$AD" = "0" && "$PAUSED" = "1" && "$ADMUTE" = "0" &&  \
@@ -444,7 +456,7 @@ automute_continuous(){
     # any other unknown condition -> restore state
     else
       echo "## Restoring state ##"
-      unmute
+#      unmute #don't unmute now, it causes the buffer to play a small section of an ad when unpaused
       ADMUTE=0
       PAUSED=0
       LOCPLAY=0
@@ -457,6 +469,9 @@ automute_continuous(){
 automute_simple(){
     if [[ "$AD" = "0" ]]; then
 	   if [ "$ADMUTE" = "1" ] ;then
+          echo "sleeping 1 second to clear ad from buffer"
+          sleep 1.2
+
           unmute
 		notify_send "Unmuted Spotify"
         fi
@@ -482,6 +497,10 @@ automute_interstitial(){
      "$INITIALRUN" = "0" ]]
       then
           echo "## Regular track ##"
+          echo "sleeping 1 second to clear ad from buffer"
+          sleep 1.2
+
+          unmute
 
     # no ad, regular pause
     elif [[ "$AD" = "0" && "$PAUSED" = "1" && "$ADMUTE" = "0" &&  \
@@ -495,6 +514,9 @@ automute_interstitial(){
       then
           echo "## Interrupting local playback ##"
           stop_localplayback
+          echo "sleeping 1 second to clear ad from buffer"
+          sleep 1.2
+
           unmute
 
     # ad, manual pause
@@ -523,12 +545,15 @@ automute_interstitial(){
     # any other unknown condition -> restore state
     else
       echo "## Restoring state ##"
-      unmute
       ADMUTE=0
       PAUSED=0
       LOCPLAY=0
       PAUSESIGNAL=0
       ADFINISHED=0
+      echo "sleeping 1 second to clear ad from buffer"
+      sleep 1.2
+
+      unmute
 
     fi
 }
