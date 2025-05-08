@@ -32,7 +32,7 @@
 # WARNING: This installation script has only been tested on Ubuntu and openSUSE
 
 # DEPENDENCIES
-dep=(xprop pacmd notify-send xdotool)
+dep=(xprop pactl notify-send xdotool)
 
 # TEXT COLOURS
 readonly RED="\033[01;31m"
