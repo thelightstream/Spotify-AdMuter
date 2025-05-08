@@ -13,7 +13,7 @@ We all love Spotify, but sometimes people (like us) want to throw a party withou
 Utilities used in the script:
 
   - xprop
-  - pacmd
+  - pactl
   - notify-send
   - xdotool
 
